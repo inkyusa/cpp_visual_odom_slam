@@ -128,7 +128,8 @@ pair<vector<Mat>, vector<Mat>> generateCorrespondences(
 }
 
 
-struct ReprojectionError {
+class ReprojectionError {
+public:
     Point2d observed;
     Mat K;
 
@@ -141,29 +142,23 @@ struct ReprojectionError {
         // camera[3,4,5] are the translation.
         T p[3];
         ceres::AngleAxisRotatePoint(camera, point, p);
-
         // Apply the translation
         p[0] += camera[3];
         p[1] += camera[4];
         p[2] += camera[5];
-
         // Project to 2D
         T xp = p[0] / p[2];
         T yp = p[1] / p[2];
-
         // Apply intrinsic parameters
         T fx = T(K.at<double>(0, 0));
         T fy = T(K.at<double>(1, 1));
         T cx = T(K.at<double>(0, 2));
         T cy = T(K.at<double>(1, 2));
-
         T u = fx * xp + cx;
         T v = fy * yp + cy;
-
         // Compute residuals
         residuals[0] = u - T(observed.x);
         residuals[1] = v - T(observed.y);
-
         return true;
     }
 

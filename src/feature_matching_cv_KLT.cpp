@@ -1,8 +1,8 @@
 /*
-g++ -std=c++17 -o feature_matching_cv ./feature_matching_cv.cpp \
+g++ -std=c++17 -o feature_matching_cv_KLT ./feature_matching_cv_KLT.cpp \
 -I /Users/inkyusa/opt/miniconda3/envs/conda_pytorch_edu_p37/include/opencv4 \
 -L /Users/inkyusa/opt/miniconda3/envs/conda_pytorch_edu_p37/lib \
--lopencv_core -lopencv_imgproc -lopencv_imgcodecs -lopencv_calib3d -lopencv_features2d -lopencv_highgui -lopencv_flann
+-lopencv_core -lopencv_imgproc -lopencv_imgcodecs -lopencv_calib3d -lopencv_features2d -lopencv_highgui -lopencv_flann -lopencv_video
 */
 
 #include <iostream>
@@ -76,45 +76,23 @@ vector<DMatch> findCorrespondences(const string &image_path1, const string &imag
 int main() {
     string image_path1 = "../dataset/2011_09_26-1/2011_09_26_drive_0001_sync/image_00/data/0000000000.png";
     string image_path2 = "../dataset/2011_09_26-1/2011_09_26_drive_0001_sync/image_00/data/0000000001.png";
-
-    vector<KeyPoint> kps1, kps2;
-    Mat desc1, desc2;
     Mat img1 = imread(image_path1, IMREAD_GRAYSCALE);
     Mat img2 = imread(image_path2, IMREAD_GRAYSCALE);
 
-    //Detect keypoints
-    Ptr<Feature2D> detector = ORB::create();
-    detector->detectAndCompute(img1, noArray(), kps1, desc1);
-    detector->detectAndCompute(img2, noArray(), kps2, desc2);
-
-    //match and find correspondences
-    BFMatcher matcher(NORM_HAMMING, true);
-    vector<DMatch> matches;
-    matcher.match(desc1, desc2, matches);
-    //find K smallest matches
-    auto cmp = [](DMatch& a, DMatch& b) {
-        return a.distance < b.distance; //max-heap, max on top
-    };
-    priority_queue<DMatch, vector<DMatch>, decltype(cmp)> pq(cmp);
-    int K = 20;
-    for (const auto& m : matches) {
-        pq.push(m);
-        if (pq.size() > K) {
-            pq.pop();
+    vector<Point2f> temp_pts1, temp_pts2;
+    goodFeaturesToTrack(img1, temp_pts1, 2000, 0.01, 10);
+    vector<uchar> status;
+    vector<float> err;
+    calcOpticalFlowPyrLK(img1, img2, temp_pts1, temp_pts2, status, err);
+    // Remove points for which tracking failed
+    vector<Point2f> pts1, pts2;
+    for (size_t i = 0; i < status.size(); ++i) {
+        if (status[i]) {
+            pts1.push_back(temp_pts1[i]);
+            pts2.push_back(temp_pts2[i]);
         }
     }
-    vector<DMatch> good_matches;
-    while (!pq.empty()) {
-        good_matches.push_back(pq.top());
-        pq.pop();
-    }
 
-    vector<Point2f> pts1, pts2;
-    for (const auto& m : good_matches) {
-        Point2f pt;
-        pts1.push_back(kps1[m.queryIdx].pt);
-        pts2.push_back(kps2[m.trainIdx].pt);
-    }
     cout <<"pts1.size() = " << pts1.size() << endl;
     cout <<"pts2.size() = " << pts2.size() << endl;
 
