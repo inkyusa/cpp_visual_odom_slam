@@ -94,4 +94,45 @@ int main(void) {
     cout << "# of correspondences = " << pts1.size() << endl;
     cout <<"R_gt = " << R_gt << endl;
     cout <<"t_gt = " << t_gt << endl;
+
+
+    //Find E gvie two pairs
+    Mat E = findEssentialMat(pts1, pts2, K, RANSAC, 0.999, 1);
+    cout << "E = " << E << endl;
+    //recover R, t from E
+    Mat R_esti, t_esti; //t_esti will be up to scale
+    int inliers = recoverPose(E, pts1, pts2, K, R_esti, t_esti);
+    cout << "R_esti = " << R_esti << endl;
+    cout << "t_esti = " << t_esti << endl;
+
+    //Given two views triangulate 3D point
+
+    Mat P1 = K * Mat::eye(3, 4, CV_64F);
+    Mat temp;
+    hconcat(R_gt, t_gt, temp);
+    Mat P2 = K * temp;
+    Mat point4D;
+    triangulatePoints(P1, P2, pts1, pts2, point4D);
+    //extract 3D points
+    vector<Point3d> triPts;
+    for (int i = 0; i < point4D.cols; i++) {
+        Mat col = point4D.col(i);
+        col = col / col.at<double>(3, 0); //normalisation
+        Point3d pt;
+        pt.x = col.at<double>(0, 0);
+        pt.y = col.at<double>(1, 0);
+        pt.z = col.at<double>(2, 0);
+        triPts.push_back(pt);
+    }
+    for (const auto& pt : triPts) {
+        cout << pt << endl;
+    }
+
+    //Pnp algorithm, finding R, t given 3D points and 2d points
+    Mat R_pnp, t_pnp;
+    solvePnP(triPts, pts2, K, Mat(), R_pnp, t_pnp); //it uses DLT.
+    cout << R_pnp << endl;
+    cout << t_pnp << endl;
+    
+
 }

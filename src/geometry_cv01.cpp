@@ -1,5 +1,5 @@
 /*
-g++ -std=c++17 -o gen_corrs ./gen_corrs.cpp \
+g++ -std=c++17 -o geometry_cv ./geometry_cv.cpp \
 -I /Users/inkyusa/opt/miniconda3/envs/conda_pytorch_edu_p37/include/opencv4 \
 -I /usr/local/include/eigen3 \
 -L /Users/inkyusa/opt/miniconda3/envs/conda_pytorch_edu_p37/lib \
@@ -92,6 +92,55 @@ int main(void) {
     vector<Point2d> pts1, pts2;
     auto [R_gt, t_gt] = generateCorrespondences(pts1, pts2, K);
     cout << "# of correspondences = " << pts1.size() << endl;
-    cout <<"R_gt = " << R_gt << endl;
-    cout <<"t_gt = " << t_gt << endl;
+
+    //Find Essential matrix given correspondences
+    Mat E = findEssentialMat(pts1, pts2, K, RANSAC, 0.9999, 0.5);
+
+    //verification of E
+    Mat x2_mat = (Mat_<double>(3, 1) << pts2[0].x, pts2[0].y, 1);
+    Mat x1_mat = (Mat_<double>(3, 1) << pts1[0].x, pts1[0].y, 1);
+    Mat result = (K.inv()*x2_mat).t() * E * K.inv()*x1_mat;
+    // Point2d x2 = pts2[0];
+    // Point2d x1 = pts1[0];
+    cout << result << endl;
+
+    //Recover R and t from it
+    Mat R, t;
+    int inliers = recoverPose(E, pts1, pts2, K, R, t);
+    cout << "R = " << R << endl;
+    cout << "t = " << t << endl;
+
+    cout << "R_gt = " << R_gt << endl;
+    cout << "t_gt = " << t_gt << endl;
+
+    //Triangulation
+    //Given two poses P1 and P2 and their correspondences
+    Mat P1 = K * Mat::eye(3, 4, CV_64F); //initial pose, 3x4
+    Mat temp;
+    hconcat(R_gt, t_gt, temp);
+    Mat P2 = K * temp;
+    Mat reconPoints;
+    triangulatePoints(P1, P2, pts1, pts2, reconPoints);
+    cout << reconPoints.rows << reconPoints.cols << endl;
+    vector<Point3d> triPts;
+    for (int i = 0; i < reconPoints.cols; i++) {
+        Mat point = reconPoints.col(i); //4x1
+        point = point / point.at<double>(3, 0);//
+        Point3d pt;
+        pt.x = point.at<double>(0, 0);
+        pt.y = point.at<double>(1, 0);
+        pt.z = point.at<double>(2, 0);
+        triPts.push_back(pt);
+    }
+    for (const auto& pt : triPts) {
+        cout << pt << endl;
+    }
+    //PnP problem
+    //Given X2 and x2 correspondences, estimate R and t
+    Mat R_pnp, t_pnp;
+    solvePnP(triPts, pts2, K, Mat(), R_pnp, t_pnp);
+    cout << R_pnp << endl; //x, y, z euler angle (rad)
+    cout << t_pnp << endl; //x, y, z
+
+
 }
