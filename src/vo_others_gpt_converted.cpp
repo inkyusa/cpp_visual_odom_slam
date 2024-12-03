@@ -165,12 +165,15 @@ cv::Mat VisualOdometry::getPose(const std::vector<cv::Point2f>& q1, const std::v
 }
 
 void VisualOdometry::run() {
+    std::ofstream traj_file("trajectory_.txt");
     std::vector<cv::Point2f> gt_path, estimated_path;
     cv::Mat cur_pose = cv::Mat::eye(4, 4, CV_64F);
+    std::cout << K_ << std::endl;
 
     for (size_t i = 0; i < images_.size(); ++i) {
         if (i == 0) {
             cur_pose = gt_poses_[i];
+            traj_file << 0 << " " << 0 << " " << 0 << std::endl; 
         } else {
             std::vector<cv::Point2f> q1, q2;
             getMatches(i, q1, q2);
@@ -179,11 +182,14 @@ void VisualOdometry::run() {
                 continue;
             }
             cv::Mat transformation = getPose(q1, q2);
+            std::cout << "transformation" << transformation << std::endl;
             cur_pose = cur_pose * transformation.inv();
         }
         // Extract positions
         gt_path.push_back(cv::Point2f(gt_poses_[i].at<double>(0, 3), gt_poses_[i].at<double>(2, 3)));
         estimated_path.push_back(cv::Point2f(cur_pose.at<double>(0, 3), cur_pose.at<double>(2, 3)));
+        traj_file << cur_pose.at<double>(0, 3) << " " << cur_pose.at<double>(1, 3) << " " << cur_pose.at<double>(2, 3) << std::endl;
+        // trajFile << x << " " << y << " " << z << std::endl;
     }
 
     // Visualization

@@ -21,9 +21,10 @@ int main() {
     cv::glob(folderPath + "*", imgPaths, false);
     int n = imgPaths.size();
 
-    Mat K = (Mat_<double>(3, 3) << 9.842439e+02, 0.000000e+00, 6.900000e+02,
-                                          0.000000e+00, 9.808141e+02, 2.331966e+02,
+    Mat K = (Mat_<double>(3, 3) << 718.856, 0.000000e+00, 607.1928,
+                                          0.000000e+00, 718.856, 185.2157,
                                           0.000000e+00, 0.000000e+00, 1.000000e+0);
+
     cout << n << endl;
     bool init = false;
     Mat img1, img2;
@@ -31,7 +32,6 @@ int main() {
     Mat desc1, desc2;
     Ptr<Feature2D> detector = ORB::create(5000);
     BFMatcher matcher(NORM_HAMMING, true); //hamming distance for binary desc, cross matching check on
-    int topK = 300; //maintain min-distance, 50
     vector<Mat> trajectory;
     trajectory.push_back(Mat::eye(4, 4, CV_64F)); //initial pose
     // Open a file to write the trajectory positions
@@ -48,68 +48,24 @@ int main() {
             img2 = imread(imgPaths[i], IMREAD_GRAYSCALE);
             detector->detectAndCompute(img2, noArray(), kpts2, desc2); //no mask
             // //Matching
-
-            // FLANN parameters for LSH (Locality Sensitive Hashing)
-            FlannBasedMatcher matcher(makePtr<flann::LshIndexParams>(12, 20, 2));
-
-            // Perform knnMatch
-            vector<vector<DMatch>> knnMatches;
-            matcher.knnMatch(desc1, desc2, knnMatches, 2); // k=2 for the two nearest neighbors
-
-            // Apply Lowe's Ratio Test
-            vector<DMatch> goodMatches;
-            const float ratioThresh = 0.8f; // Lowe's ratio threshold
-            for (size_t i = 0; i < knnMatches.size(); i++) {
-                if (knnMatches[i][0].distance < ratioThresh * knnMatches[i][1].distance) {
-                    goodMatches.push_back(knnMatches[i][0]);
-                }
-            }
-
-            // Output the number of good matches
-            cout << "Number of good matches: " << goodMatches.size() << endl;
-
-
-
-            // vector<DMatch> matches;
-            // matcher.match(desc1, desc2, matches);
-            // auto cmp = [](DMatch& a, DMatch& b) {
-            //     return a.distance < b.distance; //max-heap, max on top
-            // };
-            // priority_queue<DMatch, vector<DMatch>, decltype(cmp)> pq(cmp);
-            // for (const auto& match : matches) {
-            //     pq.push(match);
-            //     if (pq.size() > topK) {
-            //         pq.pop();
-            //     }
-            // }
-            // vector<DMatch> good_matches;
-            // while (!pq.empty()) {
-            //     good_matches.push_back(pq.top());
-            //     pq.pop();
-            // }
+            vector<DMatch> matches;
+            matcher.match(desc1, desc2, matches);
             vector<Point2d> pts1, pts2;
-            for (const auto& m : goodMatches) {
+            for (const auto& m : matches) {
                 pts1.push_back(kpts1[m.queryIdx].pt);
                 pts2.push_back(kpts2[m.trainIdx].pt);
             }
             Mat mask;
             Mat R, t;
-            Mat E = findEssentialMat(pts1, pts2, K, RANSAC, 0.99, 1, mask); //0.5 pixel threhold, 0.999 confidence
-            // vector<Point2d> pts1_inliers, pts2_inliers;
-            // for (int i = 0; i < mask.rows; i++) {
-            //     if (mask.at<bool>(i, 0)) {
-            //         pts1_inliers.push_back(pts1[i]);
-            //         pts2_inliers.push_back(pts2[i]);
-            //     }
-            // }
+            Mat E = findEssentialMat(pts1, pts2, K, RANSAC, 0.99999, 0.5, mask); //0.5 pixel threhold, 0.999 confidence
             recoverPose(E, pts1, pts2, K, R, t, mask);
-            cout <<"R = " << R << endl;
-            cout <<"t = " << t << endl;
+            // cout <<"R = " << R << endl;
+            // cout <<"t = " << t << endl;
             Mat T = Mat::eye(4, 4, CV_64F);
             R.copyTo(T.rowRange(0, 3).colRange(0, 3));
             t.copyTo(T.rowRange(0, 3).col(3));
             // Write the position to the file
-            // cout << "T = " << T << endl;
+            cout << "Transformation" << T << endl;
             Mat currPose = trajectory.back();
             currPose = currPose * T.inv();
             trajectory.push_back(currPose);
@@ -117,8 +73,6 @@ int main() {
             double y = currPose.at<double>(1, 3);
             double z = currPose.at<double>(2, 3);
             trajFile << x << " " << y << " " << z << std::endl;
-            
-
             img1 = img2.clone();
             desc1 = desc2.clone();
             kpts1 = kpts2;
