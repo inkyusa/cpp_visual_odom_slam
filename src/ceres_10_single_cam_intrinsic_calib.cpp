@@ -1,7 +1,11 @@
 /*
 Compilation instructions:
-g++ -std=c++17 -o ceres_single_cam_intrinsic_calib ceres_single_cam_intrinsic_calib.cpp \
-    -lceres -lglog -pthread
+g++ -std=c++17 -o ceres_10_single_cam_intrinsic_calib ./ceres_10_single_cam_intrinsic_calib.cpp \
+-I /usr/local/Cellar/ceres-solver/2.2.0_1/include/ceres \
+-I /usr/local/include/eigen3 \
+-L /usr/local/Cellar/ceres-solver/2.2.0_1/lib \
+-L /Users/inkyusa/opt/miniconda3/envs/conda_pytorch_edu_p37/lib \
+-lceres -lglog -lprotobuf -pthread
 */
 
 #include <iostream>
